@@ -1,25 +1,33 @@
 const express = require('express');
-const axios = require('axios');
-const cors = require('cors');
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(cors());
-
-// মেইন রাউট যা আপনার ব্লগে দেখাবে
+// এটি আপনার মেইন হোমপেজ এবং প্লেয়ার হিসেবে কাজ করবে
 app.get('/', (req, res) => {
     const { id, type, s, e } = req.query;
-    if (!id) return res.send("Shawonflix Player: No ID provided");
 
-    // মুভিবক্সের সেই এপিআই লিঙ্ক যা আপনি বের করেছেন
+    // যদি কোনো আইডি না দেওয়া থাকে, তবে একটি সিম্পল মেসেজ দেখাবে
+    if (!id) {
+        return res.send(`
+            <div style="background:#000; color:#fff; height:100vh; display:flex; align-items:center; justify-content:center; font-family:sans-serif;">
+                <h1>Shawonflix Player is Ready!</h1>
+            </div>
+        `);
+    }
+
+    // মুভিবক্সের সেই এপিআই লিঙ্ক যা দিয়ে ভিডিও প্লে হবে
     let target = `https://123movienow.cc/spa/videoPlayPage/${type === '2' ? 'tv' : 'movies'}/play?id=${id}&type=${type || 1}&lang=en&host=moviebox.ph`;
-    if(type === '2') target += `&s=${s || 1}&e=${e || 1}`;
+    
+    if(type === '2') {
+        target += `&s=${s || 1}&e=${e || 1}`;
+    }
 
-    // সরাসরি HTML রিটার্ন করবে যা আইফ্রেমকে ধোঁকা দেবে
+    // সরাসরি রেসপন্স হিসেবে প্লেয়ার পাঠিয়ে দিবে
     res.send(`
         <!DOCTYPE html>
         <html>
         <head>
+            <meta charset="UTF-8">
             <style>body,html{margin:0;padding:0;width:100%;height:100%;background:#000;overflow:hidden;}iframe{width:100%;height:100%;border:none;}</style>
         </head>
         <body>
@@ -30,5 +38,5 @@ app.get('/', (req, res) => {
 });
 
 app.listen(port, () => {
-    console.log(`Server is running!`);
+    console.log(`Server is running on port ${port}`);
 });
