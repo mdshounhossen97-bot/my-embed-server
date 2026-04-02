@@ -6,27 +6,29 @@ const port = process.env.PORT || 3000;
 
 app.use(cors());
 
-app.get('/play', async (req, res) => {
-    const { id, type } = req.query;
-    if (!id) return res.status(400).send('ID is required');
+// মেইন রাউট যা আপনার ব্লগে দেখাবে
+app.get('/', (req, res) => {
+    const { id, type, s, e } = req.query;
+    if (!id) return res.send("Shawonflix Player: No ID provided");
 
-    // আপনার বের করা মেইন এপিআই লিঙ্ক
-    const targetUrl = `https://123movienow.cc/spa/videoPlayPage/${type === '2' ? 'tv' : 'movies'}/play?id=${id}&type=${type || 1}&lang=en&host=moviebox.ph`;
+    // মুভিবক্সের সেই এপিআই লিঙ্ক যা আপনি বের করেছেন
+    let target = `https://123movienow.cc/spa/videoPlayPage/${type === '2' ? 'tv' : 'movies'}/play?id=${id}&type=${type || 1}&lang=en&host=moviebox.ph`;
+    if(type === '2') target += `&s=${s || 1}&e=${e || 1}`;
 
-    try {
-        const response = await axios.get(targetUrl, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Referer': 'https://www.moviebox.ph/',
-                'Origin': 'https://www.moviebox.ph'
-            }
-        });
-        res.send(response.data);
-    } catch (error) {
-        res.status(500).send('Error fetching data from MovieBox');
-    }
+    // সরাসরি HTML রিটার্ন করবে যা আইফ্রেমকে ধোঁকা দেবে
+    res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>body,html{margin:0;padding:0;width:100%;height:100%;background:#000;overflow:hidden;}iframe{width:100%;height:100%;border:none;}</style>
+        </head>
+        <body>
+            <iframe src="${target}" referrerpolicy="no-referrer" allowfullscreen="true" allow="autoplay; encrypted-media"></iframe>
+        </body>
+        </html>
+    `);
 });
 
 app.listen(port, () => {
-    console.log(`Server running on port ${port}`);
+    console.log(`Server is running!`);
 });
