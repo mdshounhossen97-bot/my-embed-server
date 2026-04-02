@@ -1,9 +1,0 @@
-fastapi
-uvicorn
-moviebox-api[cli]
-pydantic==2.9.2
-rich
-click
-bs4
-httpx
-throttlebuster
