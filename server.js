@@ -1,50 +1,45 @@
 const express = require('express');
-const axios = require('axios');
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.get('/', async (req, res) => {
+app.get('/', (req, res) => {
     const { id, type, s, e } = req.query;
 
-    if (!id) {
-        return res.send('<h1 style="color:white;text-align:center;font-family:sans-serif;margin-top:20%;">Shawonflix Official API Player</h1>');
+    if (!id) return res.send('<h1 style="color:white;text-align:center;padding-top:20%;">Shawonflix API Active</h1>');
+
+    // মুভিবক্সের সেই গেটওয়ে যা আপনি নেটওয়ার্ক ট্যাব থেকে পেয়েছেন
+    // আমি এখানে &host=moviebox.ph নিশ্চিত করলাম
+    let embedUrl = `https://www.moviebox.ph/play?id=${id}&type=${type || 1}&host=moviebox.ph`;
+    
+    if(type === '2') {
+        embedUrl += `&s=${s || 1}&e=${e || 1}`;
     }
 
-    // মুভিবক্সের মেইন এইচ৫ এপিআই এন্ডপয়েন্ট
-    const targetUrl = `https://123movienow.cc/spa/videoPlayPage/${type === '2' ? 'tv' : 'movies'}/play?id=${id}&type=${type || 1}&lang=en&host=moviebox.ph${type === '2' ? `&s=${s || 1}&e=${e || 1}` : ''}`;
+    // সিকিউরিটি হেডারগুলো মাস্ট দিতে হবে যাতে ব্রাউজার বাধা না দেয়
+    res.setHeader('Content-Security-Policy', "frame-ancestors *");
+    res.setHeader('X-Frame-Options', 'ALLOWALL');
 
-    try {
-        // এখানে আমরা মুভিবক্সের সিকিউরিটি হেডারের নকল করছি
-        const response = await axios.get(targetUrl, {
-            headers: {
-                'Referer': 'https://www.moviebox.ph/',
-                'Origin': 'https://www.moviebox.ph',
-                'User-Agent': 'Mozilla/5.0 (Linux; Android 10; SM-G981B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.162 Mobile Safari/537.36',
-                'Platform': 'h5',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'X-Requested-With': 'XMLHttpRequest'
-            }
-        });
-
-        // সরাসরি প্লেয়ারের কন্টেন্ট পাঠিয়ে দিচ্ছি
-        res.send(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <style>body,html{margin:0;padding:0;width:100%;height:100%;background:#000;overflow:hidden;}iframe{width:100%;height:100%;border:none;}</style>
-            </head>
-            <body>
-                <iframe src="${targetUrl}" referrerpolicy="no-referrer" allowfullscreen="true" allow="autoplay; encrypted-media"></iframe>
-            </body>
-            </html>
-        `);
-    } catch (error) {
-        res.status(500).send('<h2 style="color:white;text-align:center;">API Connection Error! Check Movie ID.</h2>');
-    }
+    res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="referrer" content="no-referrer">
+            <style>body,html{margin:0;padding:0;width:100%;height:100%;background:#000;overflow:hidden;}iframe{width:100%;height:100%;border:none;}</style>
+        </head>
+        <body>
+            <iframe 
+                src="${embedUrl}" 
+                referrerpolicy="no-referrer" 
+                allowfullscreen="true" 
+                allow="autoplay; encrypted-media"
+                style="width:100%; height:100%;">
+            </iframe>
+        </body>
+        </html>
+    `);
 });
 
 app.listen(port, () => {
-    console.log('Shawonflix API Server is Running!');
+    console.log('Server is running!');
 });
