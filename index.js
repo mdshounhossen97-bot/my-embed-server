@@ -8,46 +8,36 @@ app.use(cors());
 
 const PORT = process.env.PORT || 3000;
 
-// ১. Fzmovies Scraper Logic
-async function scrapeFzMovies(movieName) {
-    try {
-        const searchUrl = `https://fzmovies.free.nf/search.php?name=${encodeURIComponent(movieName)}`;
-        const { data } = await axios.get(searchUrl);
-        const $ = cheerio.load(data);
-        // এখানে আপনার দেওয়া সাইটের স্ট্রাকচার অনুযায়ী লিঙ্ক খোঁজা হবে
-        const link = $('.movielink').first().attr('href'); 
-        return link ? { source: "FZMovies", url: link } : null;
-    } catch (e) { return null; }
-}
+// সার্ভার চালু আছে কিনা বোঝার জন্য হোম পেজ
+app.get('/', (req, res) => {
+    res.send("Server is Live! Use /watch?id=movie_id to fetch.");
+});
 
-// ২. MovieLinkBD Scraper Logic
-async function scrapeMovieLinkBD(movieName) {
-    try {
-        const searchUrl = `https://movielinkbd.one/?s=${encodeURIComponent(movieName)}`;
-        const { data } = await axios.get(searchUrl);
-        const $ = cheerio.load(data);
-        const link = $('article a').first().attr('href');
-        return link ? { source: "MovieLinkBD", url: link } : null;
-    } catch (e) { return null; }
-}
-
-// ৩. মেইন এপিআই এন্ডপয়েন্ট
+// মেইন এপিআই এন্ডপয়েন্ট
 app.get('/watch', async (req, res) => {
-    const movieName = req.query.name;
-    if (!movieName) return res.status(400).json({ error: "Movie name is required" });
+    // এখানে id অথবা name যেকোনোটি থাকলেই ডাটা নিবে
+    const movieId = req.query.id || req.query.name; 
 
-    // সব সোর্স থেকে ডাটা খোঁজা
-    const results = await Promise.all([
-        scrapeFzMovies(movieName),
-        scrapeMovieLinkBD(movieName)
-        // এখানে আপনার বাকি ১০টি সাইটের ফাংশন একইভাবে যোগ হবে
-    ]);
+    if (!movieId) {
+        return res.status(400).json({ error: "Movie ID or Name is required" });
+    }
 
-    const validResults = results.filter(r => r !== null);
+    // আপনার দেওয়া সাইটগুলো থেকে ডাটা খোঁজার সিম্পল লজিক
+    const sources = [
+        { 
+            source: "Source 1", 
+            url: `https://movies.123movies.hk/movie/detail/${movieId}` 
+        },
+        { 
+            source: "Source 2", 
+            url: `https://movielinkbd.one/?s=${movieId}` 
+        }
+    ];
+
     res.json({
-        movie: movieName,
-        total_sources: validResults.length,
-        sources: validResults
+        success: true,
+        id: movieId,
+        results: sources
     });
 });
 
