@@ -1,7 +1,7 @@
 {
-  "name": "custom-movie-scraper",
+  "name": "my-embed-server",
   "version": "1.0.0",
-  "description": "Multi-source Movie Scraper API",
+  "description": "Multi-source Movie Scraper API with Redirect Support",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
@@ -11,5 +11,8 @@
     "axios": "^1.4.0",
     "cheerio": "^1.0.0-rc.12",
     "cors": "^2.8.5"
+  },
+  "engines": {
+    "node": ">=14.0.0"
   }
 }
