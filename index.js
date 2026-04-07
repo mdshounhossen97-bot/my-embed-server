@@ -5,50 +5,63 @@ const app = express();
 
 app.use(cors());
 
-// আপনার নিজস্ব প্রিমিয়াম প্লেয়ার ইন্টারফেস (Plyr.io)
-const playerHTML = (videoUrl, subtitleUrl, title) => `
+const PORT = process.env.PORT || 3000;
+
+const playerHTML = (videoUrl, isEmbed = false) => `
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Playing: ${title}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
     <style>
-        body { margin: 0; background: #000; display: flex; align-items: center; justify-content: center; height: 100vh; }
-        .container { width: 100%; max-width: 900px; }
+        body { margin: 0; background: #000; height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .container { width: 100%; height: 100%; }
+        iframe { width: 100%; height: 100%; border: none; }
     </style>
 </head>
 <body>
     <div class="container">
-        <video id="player" playsinline controls>
-            <source src="${videoUrl}" type="video/mp4" />
-            ${subtitleUrl ? `<track kind="captions" label="English" src="${subtitleUrl}" srclang="en" default>` : ''}
-        </video>
+        ${isEmbed ? 
+            `<iframe src="${videoUrl}" allowfullscreen sandbox="allow-forms allow-scripts allow-same-origin"></iframe>` : 
+            `<video id="player" playsinline controls><source src="${videoUrl}" type="video/mp4" /></video>`
+        }
     </div>
-    <script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
-    <script>const player = new Plyr('#player', { title: '${title}' });</script>
+    ${isEmbed ? '' : `<script src="https://cdn.plyr.io/3.7.8/plyr.js"></script><script>const player = new Plyr('#player');</script>`}
 </body>
 </html>
 `;
 
 app.get('/watch', (req, res) => {
-    const movieName = req.query.name || "Avatar";
+    const tmdbId = req.query.id; // ব্লগের মুভি আইডি
+    const type = req.query.type || 'movie';
 
-    // পাইথন স্ক্রিপ্ট রান করে ভিডিও লিঙ্ক আনা
-    const pythonProcess = spawn('python3', ['moviebox_worker.py', movieName]);
+    if (!tmdbId) return res.send("<h2>Error: No Movie ID provided!</h2>");
 
-    pythonProcess.stdout.on('data', (data) => {
+    // পাইথন স্ক্রিপ্টে TMDB ID পাঠানো হচ্ছে
+    const pythonProcess = spawn('python3', ['moviebox_worker.py', tmdbId]);
+
+    let pythonData = "";
+    pythonProcess.stdout.on('data', (data) => { pythonData += data.toString(); });
+
+    pythonProcess.on('close', (code) => {
         try {
-            const movieData = JSON.parse(data.toString());
-            if (movieData.video) {
-                res.send(playerHTML(movieData.video, movieData.subtitle, movieName));
+            const movieData = JSON.parse(pythonData);
+            if (movieData.video && movieData.video.startsWith('http')) {
+                // মুভিবক্স সোর্সে পাওয়া গেছে
+                return res.send(playerHTML(movieData.video, false));
             } else {
-                res.status(404).send("<h2>Movie not found in high-speed server!</h2>");
+                throw new Error("Fallback to Global Server");
             }
         } catch (e) {
-            res.status(500).send("<h2>Server Error: Searching for movie...</h2>");
+            // যদি মুভিবক্স এ না পাওয়া যায়, তবে Vidsrc সোর্সটি লোড হবে (যা TMDB ID তে বেস্ট)
+            const fallbackUrl = type === 'tv' 
+                ? `https://vidsrc.me/embed/tv?tmdb=${tmdbId}&sea=${req.query.s || 1}&epi=${req.query.e || 1}`
+                : `https://vidsrc.me/embed/movie?tmdb=${tmdbId}`;
+            
+            res.send(playerHTML(fallbackUrl, true));
         }
     });
 });
 
-app.listen(process.env.PORT || 3000, () => console.log("Premium Movie Hub is Ready!"));
+app.listen(PORT, () => console.log("Server running on port " + PORT));
