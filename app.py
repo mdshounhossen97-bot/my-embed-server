@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import asyncio
-from moviebox_api.v3 import MovieBox
+from moviebox_api import MovieBox
 
 app = Flask(__name__)
 CORS(app)
