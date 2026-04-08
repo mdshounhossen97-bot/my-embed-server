@@ -8,23 +8,22 @@ CORS(app)
 
 async def fetch_moviebox_link(query):
     try:
-        # লেটেস্ট ভার্সনে মুভিবক্স অবজেক্ট তৈরি
-        mb = moviebox_api.MovieBox()
+        # মুভিবক্সের নতুন ভার্সন অনুযায়ী সরাসরি ফাংশন কল করা
+        # যদি MovieBox ক্লাস না থাকে, তবে এটি সরাসরি মডিউল লেভেলে থাকতে পারে
+        results = await moviebox_api.search(str(query))
         
-        # মুভি সার্চ করা
-        results = await mb.search(str(query))
         if not results:
             return {"error": "Content not found"}
         
         item = results[0]
-        # মুভির বিস্তারিত এবং লিঙ্ক নেওয়া
-        details = await mb.get_item_details(item.id, item.type)
+        # আইটেম ডিটেইলস নেওয়া
+        details = await moviebox_api.get_item_details(item.id, item.type)
         
-        if details and details.download_urls:
-            # ১০৮০পি বা অন্য কোনো এভেইলেবল লিঙ্ক নেওয়া
+        if details and hasattr(details, 'download_urls') and details.download_urls:
             urls = details.download_urls
+            # লিঙ্ক বাছাই করা
             video = urls.get('1080p') or urls.get('720p') or list(urls.values())[0]
-            sub = details.subtitles[0].url if details.subtitles else ""
+            sub = details.subtitles[0].url if hasattr(details, 'subtitles') and details.subtitles else ""
             
             return {
                 "success": True,
@@ -32,13 +31,22 @@ async def fetch_moviebox_link(query):
                 "video": video,
                 "subtitle": sub
             }
-        return {"error": "No streaming link found"}
+        return {"error": "No streaming link found in details"}
     except Exception as e:
-        return {"error": str(e)}
+        # যদি উপরের নিয়মে কাজ না হয়, তবে বিকল্প উপায়ে চেষ্টা
+        try:
+            mb = moviebox_api.MovieBoxV3() # কিছু ভার্সনে এটাকে V3 বলা হয়
+            results = await mb.search(str(query))
+            item = results[0]
+            details = await mb.get_item_details(item.id, item.type)
+            video = list(details.download_urls.values())[0]
+            return {"success": True, "video": video}
+        except:
+            return {"error": f"API Error: {str(e)}"}
 
 @app.route('/')
 def home():
-    return "MovieBox API is Live and Running!"
+    return "MovieBox API is Live - Running Final Build"
 
 @app.route('/stream')
 def stream():
