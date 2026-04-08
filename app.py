@@ -1,62 +1,62 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import asyncio
-import moviebox_api
+from moviebox_api import MovieBoxV3
 
 app = Flask(__name__)
 CORS(app)
 
-async def fetch_moviebox_link(query):
+async def get_link(query):
     try:
-        # মুভিবক্সের নতুন ভার্সন অনুযায়ী সরাসরি ফাংশন কল করা
-        # যদি MovieBox ক্লাস না থাকে, তবে এটি সরাসরি মডিউল লেভেলে থাকতে পারে
-        results = await moviebox_api.search(str(query))
+        # মুভিবক্স ভি৩ ইঞ্জিন চালু করা
+        engine = MovieBoxV3()
         
-        if not results:
-            return {"error": "Content not found"}
+        # মুভি সার্চ করা
+        search_results = await engine.search(str(query))
+        if not search_results:
+            return {"error": "No results found for this movie."}
         
-        item = results[0]
-        # আইটেম ডিটেইলস নেওয়া
-        details = await moviebox_api.get_item_details(item.id, item.type)
+        # প্রথম রেজাল্টটি নেওয়া
+        movie = search_results[0]
         
-        if details and hasattr(details, 'download_urls') and details.download_urls:
-            urls = details.download_urls
-            # লিঙ্ক বাছাই করা
-            video = urls.get('1080p') or urls.get('720p') or list(urls.values())[0]
-            sub = details.subtitles[0].url if hasattr(details, 'subtitles') and details.subtitles else ""
+        # মুভির ভেতরের লিংক এবং ডিটেইলস বের করা
+        details = await engine.get_item_details(movie.id, movie.type)
+        
+        # ভিডিও লিংক চেক করা
+        if details and details.download_urls:
+            # ১০৮০পি বা বেস্ট কোয়ালিটি লিংক নেওয়া
+            video_url = details.download_urls.get('1080p') or \
+                        details.download_urls.get('720p') or \
+                        list(details.download_urls.values())[0]
             
             return {
                 "success": True,
-                "title": item.title,
-                "video": video,
-                "subtitle": sub
+                "title": movie.title,
+                "video": video_url,
+                "type": movie.type
             }
-        return {"error": "No streaming link found in details"}
+        else:
+            return {"error": "Video link not found in details."}
+            
     except Exception as e:
-        # যদি উপরের নিয়মে কাজ না হয়, তবে বিকল্প উপায়ে চেষ্টা
-        try:
-            mb = moviebox_api.MovieBoxV3() # কিছু ভার্সনে এটাকে V3 বলা হয়
-            results = await mb.search(str(query))
-            item = results[0]
-            details = await mb.get_item_details(item.id, item.type)
-            video = list(details.download_urls.values())[0]
-            return {"success": True, "video": video}
-        except:
-            return {"error": f"API Error: {str(e)}"}
+        return {"error": f"Internal Server Error: {str(e)}"}
 
 @app.route('/')
 def home():
-    return "MovieBox API is Live - Running Final Build"
+    return "MovieBox API is Live - Final Working Build"
 
 @app.route('/stream')
 def stream():
-    query = request.args.get('id')
-    if not query:
-        return jsonify({"error": "Provide Movie ID or Name"}), 400
+    movie_id = request.args.get('id')
+    if not movie_id:
+        return jsonify({"error": "Please provide a movie name or ID. Example: /stream?id=Avatar"}), 400
     
+    # নতুন লুপ তৈরি করে অ্যাসিনক্রোনাস ফাংশন রান করা
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    result = loop.run_until_complete(fetch_moviebox_link(query))
+    result = loop.run_until_complete(get_link(movie_id))
+    loop.close()
+    
     return jsonify(result)
 
 if __name__ == "__main__":
