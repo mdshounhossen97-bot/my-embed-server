@@ -1,6 +1,7 @@
 {
-  "name": "shawonflix-auto-streamer",
+  "name": "shawonflix-engine-v2",
   "version": "1.0.0",
+  "description": "Custom Movie Scraper Engine",
   "main": "server.js",
   "dependencies": {
     "express": "^4.18.2",
