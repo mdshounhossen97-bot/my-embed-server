@@ -1,7 +1,0 @@
-flask
-flask-cors
-moviebox-api
-httpx
-h2
-asyncio
-gunicorn
