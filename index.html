@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shawonflix AI Engine</title>
+    <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+    <style>
+        body { background: #000; color: #fff; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+        .container { width: 90%; max-width: 800px; text-align: center; }
+        .search-box { margin-bottom: 30px; }
+        input { padding: 15px; width: 60%; border-radius: 30px; border: 2px solid #e50914; background: #141414; color: #fff; outline: none; font-size: 16px; }
+        button { padding: 15px 30px; border-radius: 30px; background: #e50914; color: #fff; border: none; cursor: pointer; font-weight: bold; margin-left: 10px; transition: 0.3s; }
+        button:hover { background: #ff0a16; transform: scale(1.05); }
+        #player-wrapper { width: 100%; border-radius: 12px; overflow: hidden; display: none; box-shadow: 0 10px 30px rgba(229, 9, 20, 0.3); }
+        .loading { display: none; color: #e50914; margin-top: 10px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1 style="color: #e50914; letter-spacing: 2px;">SHAWONFLIX AI</h1>
+    <div class="search-box">
+        <input type="text" id="movieInput" placeholder="Type Movie/Series Name...">
+        <button onclick="streamNow()">PLAY NOW</button>
+        <div id="loader" class="loading">Searching Fast Server...</div>
+    </div>
+
+    <div id="player-wrapper">
+        <video id="player" playsinline controls>
+            <source src="" type="video/mp4" />
+        </video>
+    </div>
+</div>
+
+<script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
+<script>
+    const player = new Plyr('#player', {
+        quality: { default: 1080, options: [4320, 2880, 2160, 1440, 1080, 720, 576, 480, 360, 240] }
+    });
+
+    async function streamNow() {
+        const movie = document.getElementById('movieInput').value;
+        if(!movie) return alert("Enter movie name");
+
+        document.getElementById('loader').style.display = 'block';
+        
+        try {
+            const response = await fetch(`/get-stream?movie=${encodeURIComponent(movie)}`);
+            const data = await response.json();
+
+            if(data.url) {
+                document.getElementById('player-wrapper').style.display = 'block';
+                player.source = {
+                    type: 'video',
+                    sources: [{ src: data.url, type: 'video/mp4' }]
+                };
+                player.play();
+                document.getElementById('loader').style.display = 'none';
+            } else {
+                alert("No High-Speed Link Found. Try again.");
+                document.getElementById('loader').style.display = 'none';
+            }
+        } catch (err) {
+            alert("Error connecting to AI engine.");
+            document.getElementById('loader').style.display = 'none';
+        }
+    }
+</script>
+</body>
+</html>
