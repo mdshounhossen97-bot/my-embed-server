@@ -1,38 +1,52 @@
 const express = require('express');
 const axios = require('axios');
 const cheerio = require('cheerio');
-const path = require('path');
 const app = express();
+const path = require('path');
 
 app.use(express.static('public'));
 
-app.get('/get-stream', async (req, res) => {
-    const movie = req.query.movie;
-    // Specific search query for high-speed direct links
-    const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(movie)}+"index+of"+(mp4|mkv)+1080p+-html+-php`;
+// এটি বিভিন্ন সোর্স থেকে ভিডিও লিঙ্ক খুঁজে বের করবে
+async function scrapeDirectLink(movieName) {
+    const searchQueries = [
+        `https://www.google.com/search?q=intitle:index.of+${encodeURIComponent(movieName)}+mp4+1080p`,
+        `https://www.google.com/search?q=${encodeURIComponent(movieName)}+direct+link+mp4`
+    ];
 
-    try {
-        const { data } = await axios.get(searchUrl, {
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36' }
-        });
+    let foundLinks = [];
 
-        const $ = cheerio.load(data);
-        let results = [];
-
-        $('a').each((i, el) => {
-            const href = $(el).attr('href');
-            if (href && href.startsWith('/url?q=')) {
-                let cleanLink = href.split('/url?q=')[1].split('&')[0];
-                if (cleanLink.match(/\.(mp4|mkv|avi)$/i)) {
-                    results.push(decodeURIComponent(cleanLink));
+    for (let url of searchQueries) {
+        try {
+            const { data } = await axios.get(url, {
+                headers: { 'User-Agent': 'Mozilla/5.0' }
+            });
+            const $ = cheerio.load(data);
+            
+            $('a').each((i, el) => {
+                const href = $(el).attr('href');
+                if (href && href.startsWith('/url?q=')) {
+                    let clean = href.split('/url?q=')[1].split('&')[0];
+                    if (clean.match(/\.(mp4|mkv)$/i)) {
+                        foundLinks.push(decodeURIComponent(clean));
+                    }
                 }
-            }
-        });
+            });
+        } catch (e) { continue; }
+    }
+    return foundLinks;
+}
 
-        // Returns the fastest found link or the most relevant one
-        res.json({ url: results.length > 0 ? results[0] : null });
-    } catch (err) {
-        res.status(500).json({ error: "Search Failed" });
+app.get('/fetch-stream', async (req, res) => {
+    const movie = req.query.name;
+    if (!movie) return res.status(400).send("No Movie Name");
+
+    const links = await scrapeDirectLink(movie);
+    
+    // সবচাইতে ভালো লিঙ্কটি পাঠানো হচ্ছে
+    if (links.length > 0) {
+        res.json({ success: true, stream_url: links[0] });
+    } else {
+        res.json({ success: false, message: "No Direct Link Found" });
     }
 });
 
@@ -41,4 +55,4 @@ app.get('/', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server: http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`Engine Live on ${PORT}`));
