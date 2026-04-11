@@ -2,63 +2,45 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Shawonflix Custom Player Engine</title>
+    <title>Shawonflix BDIX Player</title>
     <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
     <style>
-        body { background: #050505; color: #fff; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; text-align: center; }
-        .player-card { max-width: 900px; margin: auto; background: #111; border-radius: 15px; padding: 20px; box-shadow: 0 0 30px rgba(229, 9, 20, 0.2); }
-        input { width: 70%; padding: 12px; border-radius: 5px; border: 1px solid #333; background: #222; color: #fff; margin-bottom: 20px; }
-        button { padding: 12px 25px; background: #e50914; color: white; border: none; cursor: pointer; border-radius: 5px; font-weight: bold; }
-        #video-box { margin-top: 20px; display: none; }
-        .status { font-size: 14px; color: #aaa; margin-top: 10px; }
+        body { background: #000; color: #fff; font-family: sans-serif; text-align: center; padding: 20px; }
+        input { padding: 12px; width: 60%; border-radius: 5px; border: 1px solid #e50914; background: #111; color: #fff; }
+        button { padding: 12px 25px; background: #e50914; color: #fff; border: none; cursor: pointer; border-radius: 5px; font-weight: bold; }
+        #player-wrapper { max-width: 900px; margin: 30px auto; display: none; }
     </style>
 </head>
 <body>
 
-    <div class="player-card">
-        <h2 style="color: #e50914;">SHAWONFLIX AUTO-PLAYER V2</h2>
-        <input type="text" id="movieTitle" placeholder="Enter Movie Name & Year (e.g. Inception 2010)">
-        <button onclick="startEngine()">GET STREAM</button>
-        <div id="statusText" class="status">Waiting for input...</div>
+    <h1>SHAWONFLIX BDIX ENGINE</h1>
+    <input type="text" id="mName" placeholder="Movie Name (e.g. Avatar 2)">
+    <button onclick="startStream()">PLAY</button>
 
-        <div id="video-box">
-            <video id="player" playsinline controls>
-                <source src="" type="video/mp4" />
-            </video>
-        </div>
+    <div id="player-wrapper">
+        <video id="player" playsinline controls></video>
     </div>
 
     <script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
     <script>
         const player = new Plyr('#player');
 
-        async function startEngine() {
-            const name = document.getElementById('movieTitle').value;
-            const status = document.getElementById('statusText');
-            
-            if(!name) return alert("Movie name is required!");
+        async function startStream() {
+            const name = document.getElementById('mName').value;
+            if(!name) return;
 
-            status.innerText = "Searching global servers for direct link...";
-            document.getElementById('video-box').style.display = 'none';
+            const res = await fetch(`/fetch-stream?name=${encodeURIComponent(name)}`);
+            const data = await res.json();
 
-            try {
-                const response = await fetch(`/fetch-stream?name=${encodeURIComponent(name)}`);
-                const data = await response.json();
-
-                if(data.success) {
-                    status.innerText = "Fast Link Found! Loading Player...";
-                    document.getElementById('video-box').style.display = 'block';
-                    
-                    player.source = {
-                        type: 'video',
-                        sources: [{ src: data.stream_url, type: 'video/mp4' }]
-                    };
-                    player.play();
-                } else {
-                    status.innerText = "No High-Speed direct links found on open servers.";
-                }
-            } catch (err) {
-                status.innerText = "Server busy. Try again.";
+            if(data.stream_url) {
+                document.getElementById('player-wrapper').style.display = 'block';
+                player.source = {
+                    type: 'video',
+                    sources: [{ src: data.stream_url, type: 'video/mp4' }]
+                };
+                player.play();
+            } else {
+                alert("Link not found on BDIX server.");
             }
         }
     </script>
