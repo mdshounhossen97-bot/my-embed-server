@@ -1,1 +1,5 @@
-flask, requests, flask-cors, gunicorn
+flask
+requests
+flask-cors
+gunicorn
+beautifulsoup4
