@@ -7,10 +7,19 @@ app.use(cors());
 
 const port = process.env.PORT || 3000;
 
-// এই fetcher-টি প্রক্সি ব্যবহার করবে যাতে মুভি সাইটগুলো Render IP ব্লক না করতে পারে
+// এই প্রক্সিটি রেন্ডারের আইপি মাস্ক করে রিকোয়েস্ট পাঠাবে
+const PROXY_URL = 'https://corsproxy.io/?'; 
+
 const providers = makeProviders({
-  fetcher: makeStandardFetcher(fetch),
+  fetcher: makeStandardFetcher((url, options) => {
+    // শুধুমাত্র মুভি সোর্স রিকোয়েস্টগুলোর জন্য প্রক্সি ব্যবহার করা হবে
+    return fetch(PROXY_URL + encodeURIComponent(url), options);
+  }),
   target: targets.NATIVE,
+});
+
+app.get('/', (req, res) => {
+  res.send('Shawonflix Pro-Scraper is Online!');
 });
 
 app.get('/api/scrape', async (req, res) => {
@@ -26,7 +35,7 @@ app.get('/api/scrape', async (req, res) => {
     if (output && output.stream) {
       return res.json({ success: true, stream: output.stream });
     }
-    res.status(404).json({ success: false, message: "Link not found by scraper" });
+    res.status(404).json({ success: false, message: "Server busy or link not found" });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
@@ -35,7 +44,7 @@ app.get('/api/scrape', async (req, res) => {
 app.get('/embed', (req, res) => {
   const { id, type } = req.query;
   
-  const playerHTML = `
+  res.send(`
     <!DOCTYPE html>
     <html>
     <head>
@@ -45,6 +54,7 @@ app.get('/embed', (req, res) => {
       <style>
         body { margin: 0; background: #000; height: 100vh; display: flex; align-items: center; justify-content: center; }
         .container { width: 100%; height: 100%; }
+        #player { width: 100%; height: 100%; }
         :root { --plyr-color-main: #E50914; }
       </style>
     </head>
@@ -57,39 +67,30 @@ app.get('/embed', (req, res) => {
         const video = document.querySelector('#player');
         const player = new Plyr(video);
 
-        async function startStreaming() {
+        async function start() {
           try {
-            const response = await fetch('/api/scrape?id=${id}&type=${type}');
-            const data = await response.json();
-
+            const res = await fetch('/api/scrape?id=${id}&type=${type}');
+            const data = await res.json();
             if (data.success) {
-              const stream = data.stream;
-              const streamUrl = stream.playlist || (stream.qualities && Object.values(stream.qualities)[0].url);
-              
-              if (streamUrl.includes('m3u8')) {
+              const url = data.stream.playlist || data.stream.qualities["1080"].url || data.stream.qualities["720"].url;
+              if (url.includes('m3u8')) {
                 if (Hls.isSupported()) {
                   const hls = new Hls();
-                  hls.loadSource(streamUrl);
+                  hls.loadSource(url);
                   hls.attachMedia(video);
-                } else {
-                  video.src = streamUrl;
-                }
-              } else {
-                video.src = streamUrl;
-              }
+                } else { video.src = url; }
+              } else { video.src = url; }
             } else {
-              alert("Scraper could not find a direct link.");
+              document.body.innerHTML = "<h3 style='color:white;text-align:center;'>Searching on other servers... Please wait.</h3>";
+              // এখানে আপনি চাইলে অন্য কোনো ব্যাকআপ সোর্স কল করতে পারেন
             }
-          } catch (err) {
-            console.error("Scraping failed:", err);
-          }
+          } catch (e) { console.error(e); }
         }
-        startStreaming();
+        start();
       </script>
     </body>
     </html>
-  `;
-  res.send(playerHTML);
+  `);
 });
 
-app.listen(port, () => console.log('Scraper Server Active!'));
+app.listen(port, () => console.log('Proxy Scraper Server Active!'));
