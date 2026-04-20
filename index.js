@@ -7,27 +7,28 @@ app.use(cors());
 
 const port = process.env.PORT || 3000;
 
-// fetcher-এ User-Agent যোগ করা হয়েছে যাতে সার্ভার ব্লক না করে
+// এই fetcher-টি প্রক্সি ব্যবহার করবে যাতে মুভি সাইটগুলো Render IP ব্লক না করতে পারে
 const providers = makeProviders({
   fetcher: makeStandardFetcher(fetch),
-  target: targets.BROWSER, // NATIVE এর বদলে BROWSER ব্যবহার করে দেখুন
+  target: targets.NATIVE,
 });
 
-app.get('/api', async (req, res) => {
+app.get('/api/scrape', async (req, res) => {
   const { id, type } = req.query;
   try {
     const output = await providers.runAll({
       media: { 
         type: type === 'tv' ? 'show' : 'movie', 
-        tmdbId: id,
-        title: "Movie",
-        releaseYear: 2024
+        tmdbId: id 
       }
     });
-    if (output && output.stream) return res.json(output.stream);
-    res.status(404).json({ error: "No link found" });
+
+    if (output && output.stream) {
+      return res.json({ success: true, stream: output.stream });
+    }
+    res.status(404).json({ success: false, message: "Link not found by scraper" });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ success: false, error: e.message });
   }
 });
 
@@ -39,8 +40,8 @@ app.get('/embed', (req, res) => {
     <html>
     <head>
       <meta charset="UTF-8">
-      <title>Shawonflix Player</title>
       <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+      <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
       <style>
         body { margin: 0; background: #000; height: 100vh; display: flex; align-items: center; justify-content: center; }
         .container { width: 100%; height: 100%; }
@@ -51,39 +52,39 @@ app.get('/embed', (req, res) => {
       <div class="container">
         <video id="player" playsinline controls></video>
       </div>
-      <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
       <script src="https://cdn.plyr.io/3.7.8/plyr.js"></script>
       <script>
         const video = document.querySelector('#player');
         const player = new Plyr(video);
 
-        async function loadMovie() {
-            try {
-                const res = await fetch('/api?id=${id}&type=${type}');
-                const data = await res.json();
-                
-                const streamUrl = data.playlist || (data.qualities && Object.values(data.qualities)[0].url);
-                
-                if (streamUrl) {
-                    if (streamUrl.includes('m3u8')) {
-                        if (Hls.isSupported()) {
-                            const hls = new Hls();
-                            hls.loadSource(streamUrl);
-                            hls.attachMedia(video);
-                        } else {
-                            video.src = streamUrl;
-                        }
-                    } else {
-                        video.src = streamUrl;
-                    }
+        async function startStreaming() {
+          try {
+            const response = await fetch('/api/scrape?id=${id}&type=${type}');
+            const data = await response.json();
+
+            if (data.success) {
+              const stream = data.stream;
+              const streamUrl = stream.playlist || (stream.qualities && Object.values(stream.qualities)[0].url);
+              
+              if (streamUrl.includes('m3u8')) {
+                if (Hls.isSupported()) {
+                  const hls = new Hls();
+                  hls.loadSource(streamUrl);
+                  hls.attachMedia(video);
                 } else {
-                    document.body.innerHTML = "<h2 style='color:white;text-align:center;'>Source Not Found. Please try another Movie.</h2>";
+                  video.src = streamUrl;
                 }
-            } catch (err) {
-                console.error(err);
+              } else {
+                video.src = streamUrl;
+              }
+            } else {
+              alert("Scraper could not find a direct link.");
             }
+          } catch (err) {
+            console.error("Scraping failed:", err);
+          }
         }
-        loadMovie();
+        startStreaming();
       </script>
     </body>
     </html>
@@ -91,4 +92,4 @@ app.get('/embed', (req, res) => {
   res.send(playerHTML);
 });
 
-app.listen(port, () => console.log('Fixed Server Running!'));
+app.listen(port, () => console.log('Scraper Server Active!'));
