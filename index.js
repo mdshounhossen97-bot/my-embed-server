@@ -1,44 +1,12 @@
 const express = require('express');
 const cors = require('cors');
-const { makeProviders, makeStandardFetcher, targets } = require('@movie-web/providers');
-
 const app = express();
-app.use(cors());
 
+app.use(cors());
 const port = process.env.PORT || 3000;
 
-// এই প্রক্সিটি রেন্ডারের আইপি মাস্ক করে রিকোয়েস্ট পাঠাবে
-const PROXY_URL = 'https://corsproxy.io/?'; 
-
-const providers = makeProviders({
-  fetcher: makeStandardFetcher((url, options) => {
-    // শুধুমাত্র মুভি সোর্স রিকোয়েস্টগুলোর জন্য প্রক্সি ব্যবহার করা হবে
-    return fetch(PROXY_URL + encodeURIComponent(url), options);
-  }),
-  target: targets.NATIVE,
-});
-
 app.get('/', (req, res) => {
-  res.send('Shawonflix Pro-Scraper is Online!');
-});
-
-app.get('/api/scrape', async (req, res) => {
-  const { id, type } = req.query;
-  try {
-    const output = await providers.runAll({
-      media: { 
-        type: type === 'tv' ? 'show' : 'movie', 
-        tmdbId: id 
-      }
-    });
-
-    if (output && output.stream) {
-      return res.json({ success: true, stream: output.stream });
-    }
-    res.status(404).json({ success: false, message: "Server busy or link not found" });
-  } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
-  }
+  res.send('Shawonflix Hybrid Player is Online!');
 });
 
 app.get('/embed', (req, res) => {
@@ -46,51 +14,85 @@ app.get('/embed', (req, res) => {
   
   res.send(`
     <!DOCTYPE html>
-    <html>
+    <html lang="en">
     <head>
       <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Shawonflix Player</title>
       <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
-      <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
       <style>
-        body { margin: 0; background: #000; height: 100vh; display: flex; align-items: center; justify-content: center; }
+        body { margin: 0; background: #000; height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
         .container { width: 100%; height: 100%; }
         #player { width: 100%; height: 100%; }
         :root { --plyr-color-main: #E50914; }
+        #loader { color: white; font-family: sans-serif; position: absolute; }
       </style>
     </head>
     <body>
+      <div id="loader">Fetching High Quality Stream...</div>
       <div class="container">
         <video id="player" playsinline controls></video>
       </div>
-      <script src="https://cdn.plyr.io/3.7.8/plyr.js"></script>
-      <script>
-        const video = document.querySelector('#player');
-        const player = new Plyr(video);
 
-        async function start() {
+      <script type="module">
+        import { makeProviders, makeStandardFetcher, targets } from 'https://cdn.skypack.dev/@movie-web/providers';
+
+        const video = document.querySelector('#player');
+        const loader = document.getElementById('loader');
+
+        async function initScraper() {
           try {
-            const res = await fetch('/api/scrape?id=${id}&type=${type}');
-            const data = await res.json();
-            if (data.success) {
-              const url = data.stream.playlist || data.stream.qualities["1080"].url || data.stream.qualities["720"].url;
-              if (url.includes('m3u8')) {
-                if (Hls.isSupported()) {
-                  const hls = new Hls();
-                  hls.loadSource(url);
-                  hls.attachMedia(video);
-                } else { video.src = url; }
-              } else { video.src = url; }
+            // ইউজারের ব্রাউজার থেকে সরাসরি স্ক্র্যাপ করা হচ্ছে
+            const providers = makeProviders({
+              fetcher: makeStandardFetcher(fetch),
+              target: targets.BROWSER
+            });
+
+            const output = await providers.runAll({
+              media: {
+                type: "${type}" === "tv" ? "show" : "movie",
+                tmdbId: "${id}"
+              }
+            });
+
+            if (output && output.stream) {
+              loader.style.display = 'none';
+              const stream = output.stream;
+              const sourceUrl = stream.playlist || (stream.qualities && Object.values(stream.qualities)[0].url);
+
+              renderPlayer(sourceUrl);
             } else {
-              document.body.innerHTML = "<h3 style='color:white;text-align:center;'>Searching on other servers... Please wait.</h3>";
-              // এখানে আপনি চাইলে অন্য কোনো ব্যাকআপ সোর্স কল করতে পারেন
+              loader.innerText = "No direct link found. Try another movie.";
             }
-          } catch (e) { console.error(e); }
+          } catch (err) {
+            console.error(err);
+            loader.innerText = "Connection Error. Please refresh.";
+          }
         }
-        start();
+
+        function renderPlayer(url) {
+          if (url.includes('m3u8')) {
+            import('https://cdn.jsdelivr.net/npm/hls.js@latest').then((Hls) => {
+              if (Hls.default.isSupported()) {
+                const hls = new Hls.default();
+                hls.loadSource(url);
+                hls.attachMedia(video);
+              }
+            });
+          } else {
+            video.src = url;
+          }
+          
+          import('https://cdn.plyr.io/3.7.8/plyr.js').then((Plyr) => {
+            new Plyr.default(video);
+          });
+        }
+
+        initScraper();
       </script>
     </body>
     </html>
   `);
 });
 
-app.listen(port, () => console.log('Proxy Scraper Server Active!'));
+app.listen(port, () => console.log('Client-side Scraper Server running!'));
