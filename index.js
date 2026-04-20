@@ -6,7 +6,7 @@ app.use(cors());
 const port = process.env.PORT || 3000;
 
 app.get('/', (req, res) => {
-  res.send('Shawonflix High-Speed Server is Live!');
+  res.send('Shawonflix Premium Player is Online!');
 });
 
 app.get('/embed', (req, res) => {
@@ -18,74 +18,54 @@ app.get('/embed', (req, res) => {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Shawonflix Player</title>
-      <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+      <title>Shawonflix Premium Player</title>
       <style>
-        body { margin: 0; background: #000; height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-        .container { width: 100%; height: 100%; position: relative; }
-        #player { width: 100%; height: 100%; }
-        :root { --plyr-color-main: #E50914; }
-        .error-msg { color: white; text-align: center; font-family: sans-serif; display: none; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
+        .player-wrapper { position: relative; width: 100%; height: 100vh; background: #000; }
+        
+        /* Premium Loader */
+        #loader { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #E50914; font-size: 20px; font-weight: bold; z-index: 99; }
+        
+        iframe { width: 100%; height: 100%; border: none; }
+
+        /* Overlay to block unwanted clicks if any */
+        .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 80px; z-index: 10; }
       </style>
     </head>
     <body>
-      <div class="container">
-        <video id="player" playsinline controls crossorigin></video>
-        <div id="error" class="error-msg">Failed to load stream. Try another ID.</div>
+      <div id="loader">N E T F L I X</div>
+      <div class="player-wrapper">
+        <div class="overlay"></div>
+        <iframe 
+          id="premium-player"
+          src="https://vidsrc.icu/embed/\${type === 'tv' ? 'tv' : 'movie'}/\${id}" 
+          allowfullscreen 
+          scrolling="no" 
+          allow="autoplay; encrypted-media"
+          sandbox="allow-forms allow-pointer-lock allow-same-origin allow-scripts allow-top-navigation">
+        </iframe>
       </div>
 
-      <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-      <script src="https://cdn.plyr.io/3.7.8/plyr.js"></script>
-      
       <script>
-        const video = document.querySelector('#player');
-        const errorMsg = document.getElementById('error');
-        const type = "${type}" === "tv" ? "tv" : "movie";
-        const tmdbId = "${id}";
+        const iframe = document.getElementById('premium-player');
+        const loader = document.getElementById('loader');
 
-        // ২০২৬ সালের লেটেস্ট গেটওয়ে লিঙ্ক
-        const streamSource = "https://vidsrc.xyz/embed/" + type + "/" + tmdbId;
+        // লোড হয়ে গেলে লোডার সরিয়ে ফেলবে
+        iframe.onload = () => {
+          loader.style.display = 'none';
+        };
 
-        // প্লেয়ার সেটআপ
-        const player = new Plyr(video, {
-            captions: { active: true, update: true, language: 'en' }
-        });
-
-        async function loadStream() {
-            try {
-                // আমরা সরাসরি গেটওয়ে থেকে স্ট্রীম লিঙ্কটি ধরার চেষ্টা করবো
-                // যদি সোর্স সরাসরি ফাইল দেয় তবে সেটি Plyr এ চলবে
-                // অন্যথায় আমরা একটি ক্লিন এমবেড লোড করবো যা দেখতে আপনার প্লেয়ারের মতোই
-                
-                const response = await fetch(streamSource);
-                if (response.ok) {
-                    // যেহেতু আমরা সরাসরি ডিরেক্ট লিঙ্ক স্ক্র্যাপ করতে পারছি না, 
-                    // আমরা এই গেটওয়েটিকে একটি স্যান্ডবক্স আইফ্রেমের মাধ্যমে লোড করবো 
-                    // যাতে আপনার সাইটে কোনো পপ-আপ অ্যাড না আসে।
-                    
-                    document.querySelector('.container').innerHTML = \`
-                        <iframe 
-                            src="\${streamSource}" 
-                            width="100%" 
-                            height="100%" 
-                            frameborder="0" 
-                            scrolling="no" 
-                            allowfullscreen 
-                            sandbox="allow-forms allow-pointer-lock allow-same-origin allow-scripts allow-top-navigation">
-                        </iframe>\`;
-                } else {
-                    errorMsg.style.display = 'block';
-                }
-            } catch (err) {
-                errorMsg.style.display = 'block';
+        // ২০২৬ সালের হাই-কোয়ালিটি সোর্স হ্যান্ডলার
+        window.addEventListener('message', function(e) {
+            // সোর্স যদি কাজ না করে তবে ব্যাকআপ সোর্সে সুইচ করবে
+            if (e.data === 'error') {
+                iframe.src = "https://vidlink.pro/embed/\${type === 'tv' ? 'tv' : 'movie'}/\${id}?primaryColor=e50914";
             }
-        }
-
-        loadStream();
+        });
       </script>
     </body>
     </html>
   `);
 });
 
-app.listen(port, () => console.log('Final Gateway Server Running!'));
+app.listen(port, () => console.log('Premium Streaming Server Ready!'));
