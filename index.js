@@ -12,7 +12,6 @@ const providers = makeProviders({
   target: targets.NATIVE,
 });
 
-// ১. এটি এপিআই হিসেবে কাজ করবে (ডাটা পাওয়ার জন্য)
 app.get('/api', async (req, res) => {
   const { id, type } = req.query;
   try {
@@ -26,11 +25,9 @@ app.get('/api', async (req, res) => {
   }
 });
 
-// ২. এটি সরাসরি প্লেয়ার পেজ হিসেবে কাজ করবে (এমবেড করার জন্য)
 app.get('/embed', (req, res) => {
   const { id, type } = req.query;
   
-  // এই HTML টি সরাসরি ব্রাউজারে সুন্দর একটি প্লেয়ার দেখাবে
   const playerHTML = `
     <!DOCTYPE html>
     <html>
@@ -38,10 +35,11 @@ app.get('/embed', (req, res) => {
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+      <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
       <style>
-        body { margin: 0; background: #000; overflow: hidden; }
-        .container { width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; }
-        #player { width: 100%; height: 100%; }
+        body { margin: 0; background: #000; display: flex; align-items: center; justify-content: center; height: 100vh; }
+        .container { width: 100%; height: 100%; }
+        video { width: 100%; height: 100%; }
         :root { --plyr-color-main: #E50914; }
       </style>
     </head>
@@ -51,19 +49,34 @@ app.get('/embed', (req, res) => {
       </div>
       <script src="https://cdn.plyr.io/3.7.8/plyr.js"></script>
       <script>
-        const player = new Plyr('#player');
-        fetch('/api?id=${id}&type=${type}')
-          .then(res => res.json())
-          .then(data => {
-            const streamUrl = data.playlist || (data.qualities && Object.values(data.qualities)[0].url);
-            if (streamUrl) {
-              player.source = {
-                type: 'video',
-                sources: [{ src: streamUrl, type: streamUrl.includes('m3u8') ? 'application/x-mpegURL' : 'video/mp4' }]
-              };
-            }
-          })
-          .catch(() => alert('Movie Source Not Found!'));
+        document.addEventListener('DOMContentLoaded', () => {
+          const video = document.querySelector('#player');
+          const player = new Plyr(video);
+
+          fetch('/api?id=${id}&type=${type}')
+            .then(res => res.json())
+            .then(data => {
+              const streamUrl = data.playlist || (data.qualities && Object.values(data.qualities)[0].url);
+              
+              if (!streamUrl) {
+                alert("Movie not found on any server!");
+                return;
+              }
+
+              if (streamUrl.includes('m3u8')) {
+                if (Hls.isSupported()) {
+                  const hls = new Hls();
+                  hls.loadSource(streamUrl);
+                  hls.attachMedia(video);
+                } else {
+                  video.src = streamUrl;
+                }
+              } else {
+                video.src = streamUrl;
+              }
+            })
+            .catch(err => console.error("Error loading stream:", err));
+        });
       </script>
     </body>
     </html>
@@ -71,4 +84,4 @@ app.get('/embed', (req, res) => {
   res.send(playerHTML);
 });
 
-app.listen(port, () => console.log('Shawonflix Hybrid Server Ready!'));
+app.listen(port, () => console.log('Server Fixed & Running!'));
