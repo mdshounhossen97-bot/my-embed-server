@@ -3,53 +3,72 @@ const cors = require('cors');
 const { makeProviders, makeStandardFetcher, targets } = require('@movie-web/providers');
 
 const app = express();
-app.use(cors()); // এটি আপনার ব্লগারে লিঙ্কটি কাজ করতে সাহায্য করবে
+app.use(cors());
 
 const port = process.env.PORT || 3000;
 
-// Scraper Engine Setup
 const providers = makeProviders({
   fetcher: makeStandardFetcher(fetch),
   target: targets.NATIVE,
 });
 
-app.get('/', (req, res) => {
-  res.send('Shawonflix Universal Scraper is Online!');
-});
-
-app.get('/get-link', async (req, res) => {
-  const { id, type } = req.query; // id = TMDB ID, type = 'movie' or 'tv'
-
-  if (!id) {
-    return res.status(400).json({ success: false, message: "Please provide a TMDB ID" });
-  }
-
+// ১. এটি এপিআই হিসেবে কাজ করবে (ডাটা পাওয়ার জন্য)
+app.get('/api', async (req, res) => {
+  const { id, type } = req.query;
   try {
-    const mediaType = type === 'tv' ? 'show' : 'movie';
-    
     const output = await providers.runAll({
-      media: {
-        type: mediaType,
-        tmdbId: id,
-      }
+      media: { type: type === 'tv' ? 'show' : 'movie', tmdbId: id }
     });
-
-    if (output && output.stream) {
-      // ডিরেক্ট ভিডিও ফাইল লিঙ্ক এবং সাবটাইটেল পাঠানো হচ্ছে
-      res.json({ 
-        success: true, 
-        title: "Link Found",
-        stream: output.stream,
-        captions: output.stream.captions || [] 
-      });
-    } else {
-      res.status(404).json({ success: false, message: "No Direct Link Found on any server" });
-    }
-  } catch (error) {
-    res.status(500).json({ success: false, error: "Scraper Error: " + error.message });
+    if (output && output.stream) return res.json(output.stream);
+    res.status(404).json({ error: "No link found" });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 });
 
-app.listen(port, () => {
-  console.log(`Shawonflix API is live on port ${port}`);
+// ২. এটি সরাসরি প্লেয়ার পেজ হিসেবে কাজ করবে (এমবেড করার জন্য)
+app.get('/embed', (req, res) => {
+  const { id, type } = req.query;
+  
+  // এই HTML টি সরাসরি ব্রাউজারে সুন্দর একটি প্লেয়ার দেখাবে
+  const playerHTML = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+      <style>
+        body { margin: 0; background: #000; overflow: hidden; }
+        .container { width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; }
+        #player { width: 100%; height: 100%; }
+        :root { --plyr-color-main: #E50914; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <video id="player" playsinline controls></video>
+      </div>
+      <script src="https://cdn.plyr.io/3.7.8/plyr.js"></script>
+      <script>
+        const player = new Plyr('#player');
+        fetch('/api?id=${id}&type=${type}')
+          .then(res => res.json())
+          .then(data => {
+            const streamUrl = data.playlist || (data.qualities && Object.values(data.qualities)[0].url);
+            if (streamUrl) {
+              player.source = {
+                type: 'video',
+                sources: [{ src: streamUrl, type: streamUrl.includes('m3u8') ? 'application/x-mpegURL' : 'video/mp4' }]
+              };
+            }
+          })
+          .catch(() => alert('Movie Source Not Found!'));
+      </script>
+    </body>
+    </html>
+  `;
+  res.send(playerHTML);
 });
+
+app.listen(port, () => console.log('Shawonflix Hybrid Server Ready!'));
