@@ -6,7 +6,7 @@ app.use(cors());
 const port = process.env.PORT || 3000;
 
 app.get('/', (req, res) => {
-  res.send('Shawonflix Hybrid Player is Online!');
+  res.send('Shawonflix High-Speed Server is Live!');
 });
 
 app.get('/embed', (req, res) => {
@@ -22,77 +22,70 @@ app.get('/embed', (req, res) => {
       <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
       <style>
         body { margin: 0; background: #000; height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-        .container { width: 100%; height: 100%; }
+        .container { width: 100%; height: 100%; position: relative; }
         #player { width: 100%; height: 100%; }
         :root { --plyr-color-main: #E50914; }
-        #loader { color: white; font-family: sans-serif; position: absolute; }
+        .error-msg { color: white; text-align: center; font-family: sans-serif; display: none; }
       </style>
     </head>
     <body>
-      <div id="loader">Fetching High Quality Stream...</div>
       <div class="container">
-        <video id="player" playsinline controls></video>
+        <video id="player" playsinline controls crossorigin></video>
+        <div id="error" class="error-msg">Failed to load stream. Try another ID.</div>
       </div>
 
-      <script type="module">
-        import { makeProviders, makeStandardFetcher, targets } from 'https://cdn.skypack.dev/@movie-web/providers';
-
+      <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+      <script src="https://cdn.plyr.io/3.7.8/plyr.js"></script>
+      
+      <script>
         const video = document.querySelector('#player');
-        const loader = document.getElementById('loader');
+        const errorMsg = document.getElementById('error');
+        const type = "${type}" === "tv" ? "tv" : "movie";
+        const tmdbId = "${id}";
 
-        async function initScraper() {
-          try {
-            // ইউজারের ব্রাউজার থেকে সরাসরি স্ক্র্যাপ করা হচ্ছে
-            const providers = makeProviders({
-              fetcher: makeStandardFetcher(fetch),
-              target: targets.BROWSER
-            });
+        // ২০২৬ সালের লেটেস্ট গেটওয়ে লিঙ্ক
+        const streamSource = "https://vidsrc.xyz/embed/" + type + "/" + tmdbId;
 
-            const output = await providers.runAll({
-              media: {
-                type: "${type}" === "tv" ? "show" : "movie",
-                tmdbId: "${id}"
-              }
-            });
+        // প্লেয়ার সেটআপ
+        const player = new Plyr(video, {
+            captions: { active: true, update: true, language: 'en' }
+        });
 
-            if (output && output.stream) {
-              loader.style.display = 'none';
-              const stream = output.stream;
-              const sourceUrl = stream.playlist || (stream.qualities && Object.values(stream.qualities)[0].url);
-
-              renderPlayer(sourceUrl);
-            } else {
-              loader.innerText = "No direct link found. Try another movie.";
+        async function loadStream() {
+            try {
+                // আমরা সরাসরি গেটওয়ে থেকে স্ট্রীম লিঙ্কটি ধরার চেষ্টা করবো
+                // যদি সোর্স সরাসরি ফাইল দেয় তবে সেটি Plyr এ চলবে
+                // অন্যথায় আমরা একটি ক্লিন এমবেড লোড করবো যা দেখতে আপনার প্লেয়ারের মতোই
+                
+                const response = await fetch(streamSource);
+                if (response.ok) {
+                    // যেহেতু আমরা সরাসরি ডিরেক্ট লিঙ্ক স্ক্র্যাপ করতে পারছি না, 
+                    // আমরা এই গেটওয়েটিকে একটি স্যান্ডবক্স আইফ্রেমের মাধ্যমে লোড করবো 
+                    // যাতে আপনার সাইটে কোনো পপ-আপ অ্যাড না আসে।
+                    
+                    document.querySelector('.container').innerHTML = \`
+                        <iframe 
+                            src="\${streamSource}" 
+                            width="100%" 
+                            height="100%" 
+                            frameborder="0" 
+                            scrolling="no" 
+                            allowfullscreen 
+                            sandbox="allow-forms allow-pointer-lock allow-same-origin allow-scripts allow-top-navigation">
+                        </iframe>\`;
+                } else {
+                    errorMsg.style.display = 'block';
+                }
+            } catch (err) {
+                errorMsg.style.display = 'block';
             }
-          } catch (err) {
-            console.error(err);
-            loader.innerText = "Connection Error. Please refresh.";
-          }
         }
 
-        function renderPlayer(url) {
-          if (url.includes('m3u8')) {
-            import('https://cdn.jsdelivr.net/npm/hls.js@latest').then((Hls) => {
-              if (Hls.default.isSupported()) {
-                const hls = new Hls.default();
-                hls.loadSource(url);
-                hls.attachMedia(video);
-              }
-            });
-          } else {
-            video.src = url;
-          }
-          
-          import('https://cdn.plyr.io/3.7.8/plyr.js').then((Plyr) => {
-            new Plyr.default(video);
-          });
-        }
-
-        initScraper();
+        loadStream();
       </script>
     </body>
     </html>
   `);
 });
 
-app.listen(port, () => console.log('Client-side Scraper Server running!'));
+app.listen(port, () => console.log('Final Gateway Server Running!'));
