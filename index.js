@@ -7,16 +7,22 @@ app.use(cors());
 
 const port = process.env.PORT || 3000;
 
+// fetcher-এ User-Agent যোগ করা হয়েছে যাতে সার্ভার ব্লক না করে
 const providers = makeProviders({
   fetcher: makeStandardFetcher(fetch),
-  target: targets.NATIVE,
+  target: targets.BROWSER, // NATIVE এর বদলে BROWSER ব্যবহার করে দেখুন
 });
 
 app.get('/api', async (req, res) => {
   const { id, type } = req.query;
   try {
     const output = await providers.runAll({
-      media: { type: type === 'tv' ? 'show' : 'movie', tmdbId: id }
+      media: { 
+        type: type === 'tv' ? 'show' : 'movie', 
+        tmdbId: id,
+        title: "Movie",
+        releaseYear: 2024
+      }
     });
     if (output && output.stream) return res.json(output.stream);
     res.status(404).json({ error: "No link found" });
@@ -33,13 +39,11 @@ app.get('/embed', (req, res) => {
     <html>
     <head>
       <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Shawonflix Player</title>
       <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
-      <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
       <style>
-        body { margin: 0; background: #000; display: flex; align-items: center; justify-content: center; height: 100vh; }
+        body { margin: 0; background: #000; height: 100vh; display: flex; align-items: center; justify-content: center; }
         .container { width: 100%; height: 100%; }
-        video { width: 100%; height: 100%; }
         :root { --plyr-color-main: #E50914; }
       </style>
     </head>
@@ -47,36 +51,39 @@ app.get('/embed', (req, res) => {
       <div class="container">
         <video id="player" playsinline controls></video>
       </div>
+      <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
       <script src="https://cdn.plyr.io/3.7.8/plyr.js"></script>
       <script>
-        document.addEventListener('DOMContentLoaded', () => {
-          const video = document.querySelector('#player');
-          const player = new Plyr(video);
+        const video = document.querySelector('#player');
+        const player = new Plyr(video);
 
-          fetch('/api?id=${id}&type=${type}')
-            .then(res => res.json())
-            .then(data => {
-              const streamUrl = data.playlist || (data.qualities && Object.values(data.qualities)[0].url);
-              
-              if (!streamUrl) {
-                alert("Movie not found on any server!");
-                return;
-              }
-
-              if (streamUrl.includes('m3u8')) {
-                if (Hls.isSupported()) {
-                  const hls = new Hls();
-                  hls.loadSource(streamUrl);
-                  hls.attachMedia(video);
+        async function loadMovie() {
+            try {
+                const res = await fetch('/api?id=${id}&type=${type}');
+                const data = await res.json();
+                
+                const streamUrl = data.playlist || (data.qualities && Object.values(data.qualities)[0].url);
+                
+                if (streamUrl) {
+                    if (streamUrl.includes('m3u8')) {
+                        if (Hls.isSupported()) {
+                            const hls = new Hls();
+                            hls.loadSource(streamUrl);
+                            hls.attachMedia(video);
+                        } else {
+                            video.src = streamUrl;
+                        }
+                    } else {
+                        video.src = streamUrl;
+                    }
                 } else {
-                  video.src = streamUrl;
+                    document.body.innerHTML = "<h2 style='color:white;text-align:center;'>Source Not Found. Please try another Movie.</h2>";
                 }
-              } else {
-                video.src = streamUrl;
-              }
-            })
-            .catch(err => console.error("Error loading stream:", err));
-        });
+            } catch (err) {
+                console.error(err);
+            }
+        }
+        loadMovie();
       </script>
     </body>
     </html>
@@ -84,4 +91,4 @@ app.get('/embed', (req, res) => {
   res.send(playerHTML);
 });
 
-app.listen(port, () => console.log('Server Fixed & Running!'));
+app.listen(port, () => console.log('Fixed Server Running!'));
