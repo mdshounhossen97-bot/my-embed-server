@@ -1,9 +1,9 @@
 moviebox-api
-pydantic
-rich
-click
-beautifulsoup4
+pydantic==2.9.2
 httpx
-throttlebuster
 fastapi
 uvicorn
+throttlebuster
+rich
+click
+bs4
