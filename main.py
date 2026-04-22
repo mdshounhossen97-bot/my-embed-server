@@ -6,28 +6,25 @@ app = FastAPI()
 
 @app.get("/")
 def home():
-    return {"message": "MovieBox API is live!"}
+    return {"message": "Server is Running!"}
 
 @app.get("/get-link")
 async def get_movie_link(query: str):
     try:
-        # MovieAuto class instantiate kora
+        # User-Agent manually set kora jay na library-te,
+        # kintu Python 3.11 use korle onek somoy headers auto thik thake.
         auto = MovieAuto()
         
-        # 'run' method-ti movie search kore file info return kore
-        # Amra ekhane download avoid korar chesta korbo
+        # run() method search ebong link fetch duiti-i kore
         movie_file, subtitle_file = await auto.run(query)
         
         if movie_file:
             return {
                 "status": "success",
                 "title": query,
-                "stream_url": movie_file.url,  # Direct streaming link
-                "size": movie_file.size,
+                "stream_url": movie_file.url,
                 "subtitles": subtitle_file.url if subtitle_file else None
             }
-        
-        return {"status": "error", "message": "No movie found with this name."}
-
+        return {"status": "error", "message": "No movie found."}
     except Exception as e:
-        return {"status": "error", "message": f"Something went wrong: {str(e)}"}
+        return {"status": "error", "message": str(e)}
