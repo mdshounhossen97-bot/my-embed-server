@@ -1,0 +1,5 @@
+moviebox-api
+pydantic==2.9.2
+httpx
+fastapi
+uvicorn
